@@ -1,0 +1,13 @@
+numpy 
+pandas
+scikit-learn
+joblib
+xgboost
+scikit-optimize
+scipy
+skorch
+cuml-cu11
+cupy-cuda124
+psutil
+jupyter
+ipykernel
