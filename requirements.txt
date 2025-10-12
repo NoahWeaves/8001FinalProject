@@ -11,3 +11,5 @@ cupy-cuda124
 psutil
 jupyter
 ipykernel
+tqdm
+seaborn
