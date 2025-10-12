@@ -112,7 +112,77 @@ def log_print(*args, **kwargs):
 # Replace the built-in print with our logging version
 print = log_print
 
-def load_data():
+def sample_data_stratified(df, target_col="Label", max_samples=1_000_000, min_class_samples=1000, random_state=42):
+    """
+    Stratified sampling to reduce dataset size while preserving class distribution.
+    
+    Args:
+        df: Input DataFrame
+        target_col: Name of the target column
+        max_samples: Maximum total samples to keep
+        min_class_samples: Minimum samples per class
+        random_state: Random seed for reproducibility
+    
+    Returns:
+        Sampled DataFrame
+    """
+    print(f"Original dataset size: {len(df):,} rows")
+    
+    if len(df) <= max_samples:
+        print("Dataset is already within the target size, no sampling needed.")
+        return df
+    
+    # Get class distribution
+    class_counts = df[target_col].value_counts()
+    print(f"Class distribution before sampling:")
+    for cls, count in class_counts.items():
+        print(f"  {cls}: {count:,} samples ({count/len(df)*100:.2f}%)")
+    
+    # Calculate samples per class (proportional)
+    sampling_ratio = max_samples / len(df)
+    samples_per_class = {}
+    
+    for cls, count in class_counts.items():
+        n_samples = max(min_class_samples, int(count * sampling_ratio))
+        # Don't sample more than available
+        n_samples = min(n_samples, count)
+        samples_per_class[cls] = n_samples
+    
+    # Adjust if total exceeds max_samples
+    total_samples = sum(samples_per_class.values())
+    if total_samples > max_samples:
+        scale_factor = max_samples / total_samples
+        samples_per_class = {
+            cls: max(min_class_samples, int(n * scale_factor))
+            for cls, n in samples_per_class.items()
+        }
+    
+    print(f"\nSampling plan:")
+    for cls, n in samples_per_class.items():
+        print(f"  {cls}: {n:,} samples")
+    
+    # Sample each class
+    sampled_dfs = []
+    for cls, n_samples in samples_per_class.items():
+        cls_df = df[df[target_col] == cls]
+        if len(cls_df) > n_samples:
+            sampled = cls_df.sample(n=n_samples, random_state=random_state)
+        else:
+            sampled = cls_df
+        sampled_dfs.append(sampled)
+    
+    result = pd.concat(sampled_dfs, ignore_index=True)
+    # Shuffle the result
+    result = result.sample(frac=1, random_state=random_state).reset_index(drop=True)
+    
+    print(f"\nSampled dataset size: {len(result):,} rows ({len(result)/len(df)*100:.2f}% of original)")
+    print(f"Class distribution after sampling:")
+    for cls, count in result[target_col].value_counts().items():
+        print(f"  {cls}: {count:,} samples ({count/len(result)*100:.2f}%)")
+    
+    return result
+
+def load_data(max_samples=1_000_000, sample_per_file=False):
     # Function to rename columns by removing leading or trailing spaces
     def rename_columns(df):
         df.columns = df.columns.str.strip()  # Remove leading/trailing spaces
@@ -120,14 +190,43 @@ def load_data():
 
     print("Loading data...")
     csv_paths = glob.glob("data/train/*.csv")  # LDAP, MSSQL, NetBIOS, SYN, UDP, UDPlag
-    df_list = []
-    for path in tqdm(csv_paths):
-        print("Loading:", path)
-        temp = pd.read_csv(path, low_memory=True)
-        temp = rename_columns(temp)  # Clean column names
-        temp["Scenario"] = Path(path).stem  # optional for reference
-        df_list.append(temp)
+    
+    if sample_per_file:
+        # Sample each file independently before concatenation
+        print(f"Sampling strategy: {max_samples:,} samples per file")
+        df_list = []
+        for path in tqdm(csv_paths):
+            print(f"Loading: {path}")
+            temp = pd.read_csv(path, low_memory=True)
+            temp = rename_columns(temp)
+            temp["Scenario"] = Path(path).stem
+            
+            # Sample this file if too large
+            if len(temp) > max_samples:
+                temp = sample_data_stratified(temp, target_col="Label", 
+                                            max_samples=max_samples, 
+                                            min_class_samples=1000,
+                                            random_state=RANDOM_STATE)
+            df_list.append(temp)
+    else:
+        # Load all files then sample the combined dataset
+        print(f"Sampling strategy: {max_samples:,} total samples across all files")
+        df_list = []
+        for path in tqdm(csv_paths):
+            print(f"Loading: {path}")
+            temp = pd.read_csv(path, low_memory=True)
+            temp = rename_columns(temp)
+            temp["Scenario"] = Path(path).stem
+            df_list.append(temp)
+    
     df = pd.concat(df_list, ignore_index=True)
+    
+    # Sample combined dataset if needed and not already sampled per file
+    if not sample_per_file and len(df) > max_samples:
+        df = sample_data_stratified(df, target_col="Label", 
+                                   max_samples=max_samples, 
+                                   min_class_samples=1000,
+                                   random_state=RANDOM_STATE)
 
     # Drop irrelevant identifiers
     drop_cols = [
@@ -150,12 +249,8 @@ def load_data():
     # Separate features and target
     X = df.drop(columns=["Label"])
     y = df["Label"]
-
-    # Encode target
-    # le = LabelEncoder()
-    # y = le.fit_transform(y)
     
-    print(f"Data loaded: {X.shape[0]} samples, {X.shape[1]} features")
+    print(f"Data loaded: {X.shape[0]:,} samples, {X.shape[1]} features")
 
     return X, y, groups
 
@@ -481,6 +576,11 @@ def cleanup_memory():
 
 def search_cv_for_model(name, pipe, param_space, ks, X, y, groups, outdir, n_iter=60):
     """Search with explicit cleanup after fitting"""
+    # Reduce iterations for very large datasets to prevent memory issues
+    actual_n_iter = min(n_iter, 40) if len(X) > 500_000 else n_iter
+    if actual_n_iter < n_iter:
+        print(f"Reducing search iterations from {n_iter} to {actual_n_iter} due to dataset size")
+    
     # Add MI k to the search space
     if HAVE_BAYES and isinstance(param_space, dict):
         # Bayes: add k as a categorical dimension
@@ -497,7 +597,7 @@ def search_cv_for_model(name, pipe, param_space, ks, X, y, groups, outdir, n_ite
         search = BayesSearchCV(
             estimator=pipe,
             search_spaces=param_space,
-            n_iter=n_iter,
+            n_iter=actual_n_iter,
             cv=cv,
             scoring=primary_scorer(),
             n_jobs=-1,
@@ -521,7 +621,7 @@ def search_cv_for_model(name, pipe, param_space, ks, X, y, groups, outdir, n_ite
         search = RandomizedSearchCV(
             estimator=pipe,
             param_distributions=param_dist,
-            n_iter=min(n_iter, 100),
+            n_iter=min(actual_n_iter, 100),
             cv=cv,
             scoring=primary_scorer(),
             n_jobs=-1,
@@ -720,6 +820,15 @@ def main():
     print("Starting Baseline Models Training Pipeline")
     print("="*80)
     
+    # Configuration for large datasets
+    MAX_SAMPLES = 1_000_000  # Adjust based on your RAM (1M is ~8GB for typical features)
+    SAMPLE_PER_FILE = False  # Set to True to sample each file independently
+    
+    print(f"\nDataset Configuration:")
+    print(f"  Max samples: {MAX_SAMPLES:,}")
+    print(f"  Sampling strategy: {'per-file' if SAMPLE_PER_FILE else 'combined'}")
+    print(f"  Target memory usage: ~8-16 GB RAM")
+    
     # Print initial memory state
     try:
         print_memory_usage()
@@ -729,7 +838,7 @@ def main():
     outdir = make_output_dir()
     print(f"Output directory: {outdir}")
 
-    X, y, groups = load_data()
+    X, y, groups = load_data(max_samples=MAX_SAMPLES, sample_per_file=SAMPLE_PER_FILE)
     feature_names = X.columns.tolist()
     n_features = X.shape[1]
     le = LabelEncoder()

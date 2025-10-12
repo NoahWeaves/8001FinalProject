@@ -3,9 +3,11 @@
 ## Purpose
 - Train and compare baseline machine-learning classifiers for network traffic anomaly/intrusion detection.
 - Uses multiple CSVs in data/train, group-aware CV by timestamp, mutual-information feature selection, and optional GPU acceleration (RAPIDS cuML, PyTorch/skorch, XGBoost).
+- **Handles large datasets (15M+ rows) via stratified sampling to prevent memory crashes.**
 
 ## Data expectations
 - Input files: data/train/*.csv (e.g., LDAP, MSSQL, NetBIOS, SYN, UDP, UDPlag).
+- **Large dataset handling**: Automatically samples to ~1M rows while preserving class distribution.
 - Required columns:
   - Label (classification target)
   - Timestamp (used to create group-based splits; parsed with pandas.to_datetime)
@@ -32,6 +34,7 @@
 ## Quick start
 - Ensure Python 3.10+.
 - Place CSV files under data/train/.
+- **For large datasets (>5M rows)**: The script automatically samples to 1M rows. Adjust `MAX_SAMPLES` in `baseline_models.py` main() if needed.
 - Run:
   - python baseline_models.py
 
@@ -53,6 +56,16 @@
   - metrics_distribution.png
   - env_info.json
 - logs/baseline_models_*.log
+
+## Configuration for Large Datasets
+In `baseline_models.py`, adjust these variables in `main()`:
+- `MAX_SAMPLES`: Maximum rows to use (default: 1,000,000)
+- `SAMPLE_PER_FILE`: Sample each CSV independently (`True`) or sample combined data (`False`)
+
+**Memory guidelines**:
+- 1M rows ≈ 8-16 GB RAM
+- 500K rows ≈ 4-8 GB RAM
+- 2M rows ≈ 16-32 GB RAM
 
 ## Optional GPU support
 - RAPIDS cuML (RandomForest, KNN, SVC): requires compatible CUDA stack and cupy.
