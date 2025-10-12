@@ -235,19 +235,19 @@ def load_data(max_samples=1_000_000, sample_per_file=False):
     ]
     df = df.drop(columns=[c for c in drop_cols if c in df.columns], errors="ignore")
 
-    # Handle infinities
+    ## Handle infinities
     df = df.replace([np.inf, -np.inf], np.nan)
 
-    # Parse timestamps and build groups
+    ## Parse timestamps and build groups
     df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors="coerce")
     groups = df["Timestamp"].dt.floor("min")  # group by minute
-    # if we ever want to change the granulairity:
+    ## if we ever want to change the granularity:
     # groups = df["Timestamp"].dt.floor("h")   # hour
     # groups = df["Timestamp"].dt.floor("s")   # second
     # groups = df["Timestamp"].dt.floor("5min")  # 5-minute windows
     
     # Separate features and target
-    X = df.drop(columns=["Label"])
+    X = df.drop(columns=["Label", "Timestamp"])
     y = df["Label"]
     
     print(f"Data loaded: {X.shape[0]:,} samples, {X.shape[1]} features")
@@ -821,8 +821,8 @@ def main():
     print("="*80)
     
     # Configuration for large datasets
-    MAX_SAMPLES = 1_000_000  # Adjust based on your RAM (1M is ~8GB for typical features)
-    SAMPLE_PER_FILE = False  # Set to True to sample each file independently
+    MAX_SAMPLES = 200_000  # Adjust based on your RAM (1M is ~8GB for typical features)
+    SAMPLE_PER_FILE = True  # Set to True to sample each file independently
     
     print(f"\nDataset Configuration:")
     print(f"  Max samples: {MAX_SAMPLES:,}")
