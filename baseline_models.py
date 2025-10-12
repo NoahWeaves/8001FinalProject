@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt
 import glob
 from joblib import dump
 from tqdm import tqdm
-
+import warnings
 # Optional imports
 try:
     from skopt import BayesSearchCV
@@ -69,6 +69,9 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 RANDOM_STATE = 42
 np.random.seed(RANDOM_STATE)
+
+## do not display DtypeWarning from Pandas
+warnings.filterwarnings("ignore", category=pd.errors.DtypeWarning)
 
 # pd.set_option('display.max_columns', None)
 # pd.set_option('display.max_rows', None)
@@ -119,7 +122,8 @@ def load_data():
     csv_paths = glob.glob("data/train/*.csv")  # LDAP, MSSQL, NetBIOS, SYN, UDP, UDPlag
     df_list = []
     for path in tqdm(csv_paths):
-        temp = pd.read_csv(path)
+        print("Loading:", path)
+        temp = pd.read_csv(path, low_memory=True)
         temp = rename_columns(temp)  # Clean column names
         temp["Scenario"] = Path(path).stem  # optional for reference
         df_list.append(temp)
