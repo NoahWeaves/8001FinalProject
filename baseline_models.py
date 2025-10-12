@@ -78,72 +78,33 @@ np.random.seed(RANDOM_STATE)
 # Global logger instance
 logger = None
 
-def setup_logger(log_dir="logs"):
-    """
-    Set up logging to both file and console with timestamps
-    """
-    global logger
-    
-    # Create logs directory
-    log_path = Path(log_dir)
-    log_path.mkdir(parents=True, exist_ok=True)
-    
-    # Create timestamped log file
-    timestamp = time.strftime("%Y%m%d_%H%M%S")
-    log_file = log_path / f"baseline_models_{timestamp}.log"
-    
-    # Configure logger
-    logger = logging.getLogger("baseline_models")
+def setup_logger(log_path: str | Path, name: str = "baseline"):
+    lp = Path(log_path)
+    lp.parent.mkdir(parents=True, exist_ok=True)
+
+    logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
-    
-    # Remove existing handlers to avoid duplicates
-    logger.handlers.clear()
-    
-    # File handler with detailed formatting
-    file_handler = logging.FileHandler(log_file, mode='w', encoding='utf-8')
-    file_handler.setLevel(logging.INFO)
-    file_formatter = logging.Formatter(
-        '%(asctime)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    file_handler.setFormatter(file_formatter)
-    
-    # Console handler with simpler formatting
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.INFO)
-    console_formatter = logging.Formatter('%(message)s')
-    console_handler.setFormatter(console_formatter)
-    
-    # Add handlers
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
-    
-    logger.info(f"Logging initialized. Log file: {log_file}")
+    logger.propagate = False            # <- don't bubble to root (prevents dupes)
+    logger.handlers.clear()             # <- avoid stacking handlers on repeated setup
+
+    fh = logging.FileHandler(lp, encoding="utf-8")
+    fh.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+    logger.addHandler(fh)
+
     return logger
 
-import builtins  # ensure this is imported at the top
-
 def log_print(*args, **kwargs):
-    """
-    Custom print that always prints to console,
-    and also logs to the logger if available.
-    """
     global logger
-
-    # build message string similar to print()
     sep = kwargs.get("sep", " ")
     end = kwargs.get("end", "\n")
-    message = sep.join(str(arg) for arg in args)
+    message = sep.join(str(a) for a in args)
 
-    # always print to console using the real print
+    # print once to console
     builtins.print(message, end=end)
 
-    # additionally log if logger exists
+    # also write to file (no console handler attached → no dupes)
     if logger:
-        try:
-            logger.info(message.rstrip("\n"))
-        except Exception as e:
-            builtins.print(f"[log_print warning] could not log message: {e}")
+        logger.info(message.rstrip("\n"))
 
 # Replace the built-in print with our logging version
 print = log_print
