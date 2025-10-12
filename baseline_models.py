@@ -6,7 +6,7 @@ import pandas as pd
 import logging
 import sys
 import gc
-
+import builtins
 from sklearn.model_selection import GroupKFold, StratifiedKFold, train_test_split
 from sklearn.model_selection import cross_validate
 from sklearn.model_selection import RandomizedSearchCV
@@ -121,30 +121,29 @@ def setup_logger(log_dir="logs"):
     logger.info(f"Logging initialized. Log file: {log_file}")
     return logger
 
+import builtins  # ensure this is imported at the top
+
 def log_print(*args, **kwargs):
     """
-    Custom print function that prints to console and logs to file
-    Maintains print() API compatibility
+    Custom print that always prints to console,
+    and also logs to the logger if available.
     """
     global logger
-    
-    # Convert all arguments to strings and join them
-    message = ' '.join(str(arg) for arg in args)
-    
-    # Handle special print kwargs
-    sep = kwargs.get('sep', ' ')
-    end = kwargs.get('end', '\n')
-    
-    if len(args) > 1:
-        message = sep.join(str(arg) for arg in args)
-    
-    # Print to console (logger's console handler will do this)
+
+    # build message string similar to print()
+    sep = kwargs.get("sep", " ")
+    end = kwargs.get("end", "\n")
+    message = sep.join(str(arg) for arg in args)
+
+    # always print to console using the real print
+    builtins.print(message, end=end)
+
+    # additionally log if logger exists
     if logger:
-        # Log without the newline (logger adds its own)
-        logger.info(message.rstrip('\n'))
-    else:
-        # Fallback to regular print if logger not initialized
-        print(*args, **kwargs)
+        try:
+            logger.info(message.rstrip("\n"))
+        except Exception as e:
+            builtins.print(f"[log_print warning] could not log message: {e}")
 
 # Replace the built-in print with our logging version
 print = log_print
@@ -188,8 +187,8 @@ def load_data():
     y = df["Label"]
 
     # Encode target
-    le = LabelEncoder()
-    y = le.fit_transform(y)
+    # le = LabelEncoder()
+    # y = le.fit_transform(y)
     
     print(f"Data loaded: {X.shape[0]} samples, {X.shape[1]} features")
 
@@ -767,9 +766,9 @@ def main():
     feature_names = X.columns.tolist()
     n_features = X.shape[1]
     le = LabelEncoder()
+    le.fit(y.astype(str))
+    y = le.transform(y.astype(str))
     dump(le, outdir / "label_encoder.joblib")
-
-    y = le.fit_transform(y.astype(str))
     num_classes = len(le.classes_)
     # Save mapping for later interpretability
     label_map = dict(zip(le.classes_, le.transform(le.classes_)))
