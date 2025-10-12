@@ -708,7 +708,9 @@ def create_comparison_visualizations(summary_df, outdir):
 
 def main():
     # Initialize logger first
-    setup_logger()
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    log_file = f"logs/baseline_models_{timestamp}.log"
+    logger = setup_logger(log_file, name="baseline_models")
     
     print("="*80)
     print("Starting Baseline Models Training Pipeline")
