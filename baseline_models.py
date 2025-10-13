@@ -72,7 +72,7 @@ np.random.seed(RANDOM_STATE)
 
 ## do not display DtypeWarning from Pandas
 warnings.filterwarnings("ignore", category=pd.errors.DtypeWarning)
-
+warnings.filterwarnings("ignore", category=FutureWarning)
 # pd.set_option('display.max_columns', None)
 # pd.set_option('display.max_rows', None)
 # pd.set_option('display.width', 1000)
@@ -182,7 +182,7 @@ def sample_data_stratified(df, target_col="Label", max_samples=1_000_000, min_cl
     
     return result
 
-def load_data(max_samples=1_000_000, sample_per_file=False):
+def load_data(max_samples=1_000_000, min_class_samples=1000, sample_per_file=False):
     # Function to rename columns by removing leading or trailing spaces
     def rename_columns(df):
         df.columns = df.columns.str.strip()  # Remove leading/trailing spaces
@@ -199,13 +199,17 @@ def load_data(max_samples=1_000_000, sample_per_file=False):
             print(f"Loading: {path}")
             temp = pd.read_csv(path, low_memory=True)
             temp = rename_columns(temp)
+            filename_ = path.split('/')[-1].split('\\')[-1]
+            if filename_ == "UDPLag.csv":
+                temp = temp[temp["Label"] != "WebDDoS"]
+                print(f"Loaded {temp.shape[0]:,} samples from {filename_} (WebDDoS removed)")
             temp["Scenario"] = Path(path).stem
             
             # Sample this file if too large
             if len(temp) > max_samples:
                 temp = sample_data_stratified(temp, target_col="Label", 
                                             max_samples=max_samples, 
-                                            min_class_samples=1000,
+                                            min_class_samples=min_class_samples,
                                             random_state=RANDOM_STATE)
             df_list.append(temp)
     else:
@@ -216,7 +220,10 @@ def load_data(max_samples=1_000_000, sample_per_file=False):
             print(f"Loading: {path}")
             temp = pd.read_csv(path, low_memory=True)
             temp = rename_columns(temp)
-            temp["Scenario"] = Path(path).stem
+            filename_ = path.split('/')[-1].split('\\')[-1]
+            if filename_ == "UDPLag.csv":
+                temp = temp[temp["Label"] != "WebDDoS"]
+                print(f"Loaded {temp.shape[0]:,} samples from {filename_} (WebDDoS removed)")
             df_list.append(temp)
     
     df = pd.concat(df_list, ignore_index=True)
@@ -225,7 +232,7 @@ def load_data(max_samples=1_000_000, sample_per_file=False):
     if not sample_per_file and len(df) > max_samples:
         df = sample_data_stratified(df, target_col="Label", 
                                    max_samples=max_samples, 
-                                   min_class_samples=1000,
+                                   min_class_samples=min_class_samples,
                                    random_state=RANDOM_STATE)
 
     # Drop irrelevant identifiers
@@ -247,7 +254,7 @@ def load_data(max_samples=1_000_000, sample_per_file=False):
     # groups = df["Timestamp"].dt.floor("5min")  # 5-minute windows
     
     # Separate features and target
-    X = df.drop(columns=["Label", "Timestamp"])
+    X = df.drop(columns=["Label", "Timestamp", "Scenario"], errors="ignore")
     y = df["Label"]
     
     print(f"Data loaded: {X.shape[0]:,} samples, {X.shape[1]} features")
@@ -821,7 +828,8 @@ def main():
     print("="*80)
     
     # Configuration for large datasets
-    MAX_SAMPLES = 200_000  # Adjust based on your RAM (1M is ~8GB for typical features)
+    MAX_SAMPLES = 20_000  # Adjust based on your RAM (1M is ~8GB for typical features)
+    MIN_CLASS_SAMPLES = 4000  # Minimum samples per class
     SAMPLE_PER_FILE = True  # Set to True to sample each file independently
     
     print(f"\nDataset Configuration:")
@@ -838,7 +846,7 @@ def main():
     outdir = make_output_dir()
     print(f"Output directory: {outdir}")
 
-    X, y, groups = load_data(max_samples=MAX_SAMPLES, sample_per_file=SAMPLE_PER_FILE)
+    X, y, groups = load_data(max_samples=MAX_SAMPLES, min_class_samples=MIN_CLASS_SAMPLES, sample_per_file=SAMPLE_PER_FILE)
     feature_names = X.columns.tolist()
     n_features = X.shape[1]
     le = LabelEncoder()
