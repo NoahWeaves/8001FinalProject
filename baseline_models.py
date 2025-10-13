@@ -82,6 +82,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 logger = None
 
 def setup_logger(log_path: str | Path, name: str = "baseline"):
+    global logger  # Declare we're modifying the global logger
     lp = Path(log_path)
     lp.parent.mkdir(parents=True, exist_ok=True)
 
@@ -306,13 +307,16 @@ def get_cv(y, groups=None, n_splits=5, seed=RANDOM_STATE):
         return StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed), y_bins
 
 def primary_scorer():
-    return "f1_micro"
+    return "f1_weighted"  # Use weighted for imbalanced data reflecting real distribution
 
 def scoring_dict():
     return {
-        "F1_micro": make_scorer(f1_score, average="micro"),
-        "Precision_micro": make_scorer(precision_score, average="micro"),
-        "Recall_micro": make_scorer(recall_score, average="micro"),
+        "F1_macro": make_scorer(f1_score, average="macro"),
+        "F1_weighted": make_scorer(f1_score, average="weighted"),
+        "Precision_macro": make_scorer(precision_score, average="macro", zero_division=0),
+        "Precision_weighted": make_scorer(precision_score, average="weighted", zero_division=0),
+        "Recall_macro": make_scorer(recall_score, average="macro", zero_division=0),
+        "Recall_weighted": make_scorer(recall_score, average="weighted", zero_division=0),
         "Accuracy": make_scorer(accuracy_score),
     }
 
@@ -329,6 +333,10 @@ def numeric_preprocessor(scaler_type: str | None = "standard", impute: bool = Tr
             steps.append(("scale", RobustScaler()))
         else:
             raise ValueError(f"Unknown scaler_type: {scaler_type}")
+    
+    # Return 'passthrough' if no steps, otherwise return Pipeline
+    if len(steps) == 0:
+        return 'passthrough'
     return Pipeline(steps)
 
 def build_selector(k):
@@ -546,11 +554,17 @@ class TorchMLP(nn.Module):
 def build_pipeline(model, scale_for_model, n_features, scaler_type="standard", impute=True):
     pre = numeric_preprocessor(scaler_type if scale_for_model else None, impute=impute)
     selector = build_selector(k=n_features)  # tuned via search
-    return Pipeline([
-        ("pre", pre),
+    
+    # Build pipeline steps conditionally
+    steps = []
+    if pre != 'passthrough':
+        steps.append(("pre", pre))
+    steps.extend([
         ("select", selector),
         ("model", model),
     ])
+    
+    return Pipeline(steps)
 
 
 def print_memory_usage():
@@ -671,9 +685,12 @@ def evaluate_on_holdout(model, X_test, y_test, outdir, label):
 
     metrics = {
         "Accuracy": float(accuracy_score(y_test, preds)),
-        "F1_micro": float(f1_score(y_test, preds, average="micro")),
-        "Precision_micro": float(precision_score(y_test, preds, average="micro")),
-        "Recall_micro": float(recall_score(y_test, preds, average="micro")),
+        "F1_macro": float(f1_score(y_test, preds, average="macro", zero_division=0)),
+        "F1_weighted": float(f1_score(y_test, preds, average="weighted", zero_division=0)),
+        "Precision_macro": float(precision_score(y_test, preds, average="macro", zero_division=0)),
+        "Precision_weighted": float(precision_score(y_test, preds, average="weighted", zero_division=0)),
+        "Recall_macro": float(recall_score(y_test, preds, average="macro", zero_division=0)),
+        "Recall_weighted": float(recall_score(y_test, preds, average="weighted", zero_division=0)),
     }
 
     # Save predictions
@@ -691,7 +708,7 @@ def evaluate_on_holdout(model, X_test, y_test, outdir, label):
     plt.close()
 
     # Classification report (precision, recall, f1 per class)
-    report = classification_report(y_test, preds, output_dict=True)
+    report = classification_report(y_test, preds, output_dict=True, zero_division=0)
     pd.DataFrame(report).transpose().to_csv(outdir / f"{label}_classification_report.csv")
 
     # Save metrics summary
@@ -712,7 +729,7 @@ def create_comparison_visualizations(summary_df, outdir):
     
     # 1. Bar chart comparing all metrics across models
     fig, axes = plt.subplots(2, 2, figsize=(15, 12))
-    metrics = ['Accuracy', 'F1_micro', 'Precision_micro', 'Recall_micro']
+    metrics = ['Accuracy', 'F1_macro', 'Precision_macro', 'Recall_macro']
     
     for idx, metric in enumerate(metrics):
         ax = axes[idx // 2, idx % 2]
@@ -818,6 +835,7 @@ def create_comparison_visualizations(summary_df, outdir):
     print("  - metrics_distribution.png")
 
 def main():
+    global logger  # Declare we're modifying the global logger
     # Initialize logger first
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     log_file = f"logs/baseline_models_{timestamp}.log"
@@ -826,6 +844,17 @@ def main():
     print("="*80)
     print("Starting Baseline Models Training Pipeline")
     print("="*80)
+    
+    # ============================================================
+    # MODEL SELECTION FLAGS - Set to True/False to enable/disable
+    # ============================================================
+    TRAIN_LOGISTIC_REGRESSION = True
+    TRAIN_RANDOM_FOREST = True
+    TRAIN_XGBOOST = True
+    TRAIN_KNN = True
+    TRAIN_MLP = True
+    TRAIN_SVC = True
+    # ============================================================
     
     # Configuration for large datasets
     MAX_SAMPLES = 20_000  # Adjust based on your RAM (1M is ~8GB for typical features)
@@ -836,6 +865,14 @@ def main():
     print(f"  Max samples: {MAX_SAMPLES:,}")
     print(f"  Sampling strategy: {'per-file' if SAMPLE_PER_FILE else 'combined'}")
     print(f"  Target memory usage: ~8-16 GB RAM")
+    
+    print(f"\nModel Selection:")
+    print(f"  Logistic Regression: {'✓' if TRAIN_LOGISTIC_REGRESSION else '✗'}")
+    print(f"  Random Forest: {'✓' if TRAIN_RANDOM_FOREST else '✗'}")
+    print(f"  XGBoost: {'✓' if TRAIN_XGBOOST else '✗'}")
+    print(f"  k-NN: {'✓' if TRAIN_KNN else '✗'}")
+    print(f"  MLP: {'✓' if TRAIN_MLP else '✗'}")
+    print(f"  SVC: {'✓' if TRAIN_SVC else '✗'}")
     
     # Print initial memory state
     try:
@@ -896,36 +933,41 @@ def main():
     models = []
 
     # --- Logistic Regression (elastic-net) ---
-    for sub_name, est, space in logistic_space():
-        pipe = build_pipeline(est, scale_for_model=True, n_features=n_features,
-                            scaler_type="standard", impute=True)
-        models.append((f"{sub_name}", pipe, space))
+    if TRAIN_LOGISTIC_REGRESSION:
+        print("\n[+] Adding Logistic Regression to training queue")
+        for sub_name, est, space in logistic_space():
+            pipe = build_pipeline(est, scale_for_model=True, n_features=n_features,
+                                scaler_type="standard", impute=True)
+            models.append((f"{sub_name}", pipe, space))
 
     # --- Random Forest (GPU if available) ---
-    if HAVE_CUML:
-        print("Using RAPIDS cuML Random Forest (GPU)")
-        rf = cuRF(random_state=RANDOM_STATE, n_streams=4)
-        models.append((
-            "RandomForest_GPU",
-            build_pipeline(rf, scale_for_model=False, n_features=n_features,
-                        scaler_type=None, impute=True),
-            rf_space_gpu()
-        ))
-    else:
-        print("Using sklearn Random Forest (CPU)")
-        rf = RandomForestClassifier(random_state=RANDOM_STATE, n_jobs=-1)
-        models.append((
-            "RandomForest_CPU",
-            build_pipeline(rf, scale_for_model=False, n_features=n_features,
-                        scaler_type=None, impute=True),
-            rf_space()
-        ))
+    if TRAIN_RANDOM_FOREST:
+        print("[+] Adding Random Forest to training queue")
+        if HAVE_CUML:
+            print("    Using RAPIDS cuML Random Forest (GPU)")
+            rf = cuRF(random_state=RANDOM_STATE, n_streams=4)
+            models.append((
+                "RandomForest_GPU",
+                build_pipeline(rf, scale_for_model=False, n_features=n_features,
+                            scaler_type=None, impute=True),
+                rf_space_gpu()
+            ))
+        else:
+            print("    Using sklearn Random Forest (CPU)")
+            rf = RandomForestClassifier(random_state=RANDOM_STATE, n_jobs=-1)
+            models.append((
+                "RandomForest_CPU",
+                build_pipeline(rf, scale_for_model=False, n_features=n_features,
+                            scaler_type=None, impute=True),
+                rf_space()
+            ))
 
     # --- XGBoost (GPU if available) ---
-    if HAVE_XGB:
+    if TRAIN_XGBOOST and HAVE_XGB:
+        print("[+] Adding XGBoost to training queue")
         device = "cuda" if HAVE_TORCH and torch.cuda.is_available() else "cpu"
         tree_method = "hist" if device == "cpu" else "gpu_hist"
-        print(f"Using XGBoost with {tree_method} on {device}")
+        print(f"    Using XGBoost with {tree_method} on {device}")
         
         xgb = XGBClassifier(
             random_state=RANDOM_STATE,
@@ -940,103 +982,118 @@ def main():
                         scaler_type=None, impute=False),
             xgb_space()
         ))
+    elif TRAIN_XGBOOST and not HAVE_XGB:
+        print("[-] XGBoost requested but not available - skipping")
 
     # --- k-NN (GPU if available) ---
-    if HAVE_CUML:
-        print("Using RAPIDS cuML KNN (GPU)")
-        knn = cuKNN()
-        models.append((
-            "KNN_GPU",
-            build_pipeline(knn, scale_for_model=True, n_features=n_features,
-                        scaler_type="standard", impute=True),
-            knn_space_gpu()
-        ))
-    else:
-        print("Using sklearn KNN (CPU)")
-        knn = KNeighborsClassifier()
-        models.append((
-            "KNN_CPU",
-            build_pipeline(knn, scale_for_model=True, n_features=n_features,
-                        scaler_type="standard", impute=True),
-            knn_space()
-        ))
+    if TRAIN_KNN:
+        print("[+] Adding k-NN to training queue")
+        if HAVE_CUML:
+            print("    Using RAPIDS cuML KNN (GPU)")
+            knn = cuKNN()
+            models.append((
+                "KNN_GPU",
+                build_pipeline(knn, scale_for_model=True, n_features=n_features,
+                            scaler_type="standard", impute=True),
+                knn_space_gpu()
+            ))
+        else:
+            print("    Using sklearn KNN (CPU)")
+            knn = KNeighborsClassifier()
+            models.append((
+                "KNN_CPU",
+                build_pipeline(knn, scale_for_model=True, n_features=n_features,
+                            scaler_type="standard", impute=True),
+                knn_space()
+            ))
 
     # --- MLP (GPU if available) ---
-    if HAVE_TORCH and torch.cuda.is_available():
-        print("Using PyTorch MLP (GPU)")
-        device = 'cuda'
-        mlp = NeuralNetClassifier(
-            module=TorchMLP,
-            module__input_dim=n_features,
-            module__hidden_dim=128,
-            module__num_classes=num_classes,
-            module__dropout=0.2,
-            max_epochs=100,
-            lr=1e-3,
-            batch_size=128,
-            iterator_train__shuffle=True,
-            device=device,
-            verbose=0,
-        )
-        models.append((
-            "MLP_GPU",
-            build_pipeline(mlp, scale_for_model=True, n_features=n_features,
-                        scaler_type="standard", impute=True),
-            mlp_space_gpu(n_features, num_classes)
-        ))
-    else:
-        print("Using sklearn MLP (CPU)")
-        mlp = MLPClassifier(
-            early_stopping=True,
-            max_iter=400,
-            random_state=RANDOM_STATE
-        )
-        models.append((
-            "MLP_CPU",
-            build_pipeline(mlp, scale_for_model=True, n_features=n_features,
-                        scaler_type="standard", impute=True),
-            mlp_space()
-        ))
+    if TRAIN_MLP:
+        print("[+] Adding MLP to training queue")
+        if HAVE_TORCH and torch.cuda.is_available():
+            print("    Using PyTorch MLP (GPU)")
+            device = 'cuda'
+            mlp = NeuralNetClassifier(
+                module=TorchMLP,
+                module__input_dim=n_features,
+                module__hidden_dim=128,
+                module__num_classes=num_classes,
+                module__dropout=0.2,
+                max_epochs=100,
+                lr=1e-3,
+                batch_size=128,
+                iterator_train__shuffle=True,
+                device=device,
+                verbose=0,
+            )
+            models.append((
+                "MLP_GPU",
+                build_pipeline(mlp, scale_for_model=True, n_features=n_features,
+                            scaler_type="standard", impute=True),
+                mlp_space_gpu(n_features, num_classes)
+            ))
+        else:
+            print("    Using sklearn MLP (CPU)")
+            mlp = MLPClassifier(
+                early_stopping=True,
+                max_iter=400,
+                random_state=RANDOM_STATE
+            )
+            models.append((
+                "MLP_CPU",
+                build_pipeline(mlp, scale_for_model=True, n_features=n_features,
+                            scaler_type="standard", impute=True),
+                mlp_space()
+            ))
 
     # --- SVC (GPU if available) ---
-    if HAVE_CUML:
-        print("Using RAPIDS cuML SVC (GPU)")
-        svc = cuSVC(
-            kernel="rbf",
-            random_state=RANDOM_STATE
-        )
-        models.append((
-            "SVC_GPU",
-            build_pipeline(
-                svc,
-                scale_for_model=True,
-                n_features=n_features,
-                scaler_type="standard",
-                impute=True
-            ),
-            svc_space_gpu()
-        ))
-    else:
-        print("Using sklearn SVC (CPU)")
-        svc = SVC(
-            kernel="rbf",
-            probability=False,
-            decision_function_shape="ovr",
-            random_state=RANDOM_STATE
-        )
-        models.append((
-            "SVC_CPU",
-            build_pipeline(
-                svc,
-                scale_for_model=True,
-                n_features=n_features,
-                scaler_type="standard",
-                impute=True
-            ),
-            svc_space_classifier()
-        ))
+    if TRAIN_SVC:
+        print("[+] Adding SVC to training queue")
+        if HAVE_CUML:
+            print("    Using RAPIDS cuML SVC (GPU)")
+            svc = cuSVC(
+                kernel="rbf",
+                random_state=RANDOM_STATE
+            )
+            models.append((
+                "SVC_GPU",
+                build_pipeline(
+                    svc,
+                    scale_for_model=True,
+                    n_features=n_features,
+                    scaler_type="standard",
+                    impute=True
+                ),
+                svc_space_gpu()
+            ))
+        else:
+            print("    Using sklearn SVC (CPU)")
+            svc = SVC(
+                kernel="rbf",
+                probability=False,
+                decision_function_shape="ovr",
+                random_state=RANDOM_STATE
+            )
+            models.append((
+                "SVC_CPU",
+                build_pipeline(
+                    svc,
+                    scale_for_model=True,
+                    n_features=n_features,
+                    scaler_type="standard",
+                    impute=True
+                ),
+                svc_space_classifier()
+            ))
 
-    print(f"\nTotal models to train: {len(models)}")
+    if len(models) == 0:
+        print("\n[ERROR] No models selected for training!")
+        print("Please set at least one TRAIN_* flag to True")
+        return
+
+    print(f"\n{'='*80}")
+    print(f"Total models queued for training: {len(models)}")
+    print(f"{'='*80}")
     summary = []
 
     for idx, (name, pipe, space) in enumerate(models):
