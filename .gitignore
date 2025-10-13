@@ -63,8 +63,8 @@ ehthumbs.db
 Thumbs.db
 
 # Model files and large data
-*.pkl
-*.joblib
+# *.pkl
+# *.joblib
 *.h5
 *.hdf5
 *.model
@@ -76,5 +76,5 @@ Thumbs.db
 .cache/
 
 # Data
-*.csv
+# *.csv
 *.zip
