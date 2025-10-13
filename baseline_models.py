@@ -624,7 +624,7 @@ def search_cv_for_model(name, pipe, param_space, ks, X, y, groups, outdir, n_ite
             n_jobs=-1,
             random_state=RANDOM_STATE,
             refit=True,
-            verbose=0,
+            verbose=1,
         )
         search.fit(X, y, **({"groups": cv_groups} if cv_groups is not None else {}))
     else:
@@ -648,7 +648,7 @@ def search_cv_for_model(name, pipe, param_space, ks, X, y, groups, outdir, n_ite
             n_jobs=-1,
             random_state=RANDOM_STATE,
             refit=True,
-            verbose=0,
+            verbose=1,
         )
         search.fit(X, y, **({"groups": cv_groups} if cv_groups is not None else {}))
 
@@ -857,7 +857,7 @@ def main():
     # ============================================================
     
     # Configuration for large datasets
-    MAX_SAMPLES = 20_000  # Adjust based on your RAM (1M is ~8GB for typical features)
+    MAX_SAMPLES = 10_000  # Adjust based on your RAM (1M is ~8GB for typical features)
     MIN_CLASS_SAMPLES = 4000  # Minimum samples per class
     SAMPLE_PER_FILE = True  # Set to True to sample each file independently
     
@@ -1024,7 +1024,7 @@ def main():
                 batch_size=128,
                 iterator_train__shuffle=True,
                 device=device,
-                verbose=0,
+                verbose=1,
             )
             models.append((
                 "MLP_GPU",
