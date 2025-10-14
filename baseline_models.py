@@ -73,6 +73,11 @@ np.random.seed(RANDOM_STATE)
 ## do not display DtypeWarning from Pandas
 warnings.filterwarnings("ignore", category=pd.errors.DtypeWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
+try:
+    warnings.filterwarnings("ignore", category=PerformanceWarning, 
+                            message=".*pinned memory.*could not be allocated.*")
+except:
+    pass
 # pd.set_option('display.max_columns', None)
 # pd.set_option('display.max_rows', None)
 # pd.set_option('display.width', 1000)
@@ -94,7 +99,7 @@ def setup_logger(log_path: str | Path, name: str = "baseline"):
     fh = logging.FileHandler(lp, encoding="utf-8")
     fh.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
     logger.addHandler(fh)
-
+        
     return logger
 
 def log_print(*args, **kwargs):
@@ -453,13 +458,13 @@ def knn_space_gpu():
     if HAVE_BAYES:
         return {
             "model__n_neighbors": Integer(3, 15),
-            "model__weights": Categorical(["uniform", "distance"]),
+            "model__weights": Categorical(["uniform"]),  # cuML only supports uniform
             "model__p": Integer(1, 2),
         }
     else:
         return {
             "model__n_neighbors": [3, 5, 7, 11, 15],
-            "model__weights": ["uniform", "distance"],
+            "model__weights": ["uniform"],  # cuML only supports uniform
             "model__p": [1, 2],
         }
 
@@ -592,6 +597,8 @@ def cleanup_memory():
         try:
             import cupy as cp
             cp.get_default_memory_pool().free_all_blocks()
+            # Add pinned memory pool cleanup
+            cp.get_default_pinned_memory_pool().free_all_blocks()
         except Exception:
             pass
 
@@ -848,7 +855,7 @@ def main():
     # ============================================================
     # MODEL SELECTION FLAGS - Set to True/False to enable/disable
     # ============================================================
-    TRAIN_LOGISTIC_REGRESSION = True
+    TRAIN_LOGISTIC_REGRESSION = False
     TRAIN_RANDOM_FOREST = True
     TRAIN_XGBOOST = True
     TRAIN_KNN = True
@@ -979,7 +986,7 @@ def main():
         models.append((
             f"XGBoost_{device.upper()}",
             build_pipeline(xgb, scale_for_model=False, n_features=n_features,
-                        scaler_type=None, impute=False),
+                        scaler_type=None, impute=True),  # Changed from False to True
             xgb_space()
         ))
     elif TRAIN_XGBOOST and not HAVE_XGB:

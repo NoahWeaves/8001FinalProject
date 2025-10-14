@@ -1,0 +1,6 @@
+{
+  "model__C": 0.12889831133037685,
+  "model__class_weight": "balanced",
+  "model__l1_ratio": 1.0,
+  "select__k": 32
+}
