@@ -1,0 +1,7 @@
+{
+  "model__max_depth": 8,
+  "model__max_features": 1.0,
+  "model__min_samples_split": 2,
+  "model__n_estimators": 63,
+  "select__k": 64
+}

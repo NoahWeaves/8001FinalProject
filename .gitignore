@@ -7,9 +7,9 @@ git_github_lab_workflow.md
 data_EDA.ipynb
 
 # Logs and outputs
-# logs/
-# runs/
-# *.log
+logs/
+runs/
+*.log
 
 # Python
 __pycache__/
@@ -52,7 +52,7 @@ venv.bak/
 *.swp
 *.swo
 *~
-
+*.code-workspace
 # OS
 .DS_Store
 .DS_Store?

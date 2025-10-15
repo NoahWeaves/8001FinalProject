@@ -188,7 +188,7 @@ def sample_data_stratified(df, target_col="Label", max_samples=1_000_000, min_cl
     
     return result
 
-def load_data(max_samples=1_000_000, min_class_samples=1000, sample_per_file=False):
+def load_data(max_samples=1_000_000, min_class_samples=1000, sample_per_file=False, RANDOM_STATE=42):
     # Function to rename columns by removing leading or trailing spaces
     def rename_columns(df):
         df.columns = df.columns.str.strip()  # Remove leading/trailing spaces
@@ -304,9 +304,9 @@ def bin_for_stratification(y, n_bins=10):
     y_binned = np.digitize(y, edges[1:-1], right=True)
     return y_binned
 
-def get_cv(y, groups=None, n_splits=5, seed=RANDOM_STATE):
+def get_cv(y, groups=None, n_splits=5, seed=42):
     if groups is not None:
-        return GroupKFold(n_splits=n_splits)
+        return GroupKFold(n_splits=n_splits, random_state=seed)
     else:
         y_bins = bin_for_stratification(y, n_bins=10)
         return StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed), y_bins
@@ -492,6 +492,10 @@ def mlp_space_gpu(input_dim, num_classes):
             "model__module__dropout": Real(0.1, 0.5),
             "model__lr": Real(1e-4, 1e-2, prior="log-uniform"),
             "model__batch_size": Categorical([64, 128, 256]),
+            # "model__module__hidden_dim": Categorical([64]),
+            # "model__module__dropout": Real(0.1,0.2),
+            # "model__lr": Real(1e-3, 1e-2, prior="log-uniform"),
+            # "model__batch_size": Categorical([64]),            
         }
     else:
         return {
@@ -538,20 +542,27 @@ def svc_space_gpu():
 # PyTorch MLP for GPU
 class TorchMLP(nn.Module):
     """PyTorch MLP for GPU acceleration"""
-    def __init__(self, input_dim, hidden_dim=128, num_classes=2, dropout=0.2):
+    def __init__(self, input_dim=64, hidden_dim=128, num_classes=2, dropout=0.2):
         super().__init__()
+        # input_dim will be dynamically set by skorch based on data shape
+        # Default to 64 but this will be overridden when fit() is called
+        
         self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.bn1 = nn.BatchNorm1d(hidden_dim)
+        # Replace BatchNorm with LayerNorm (works with batch_size=1)
+        self.ln1 = nn.LayerNorm(hidden_dim)
         self.dropout1 = nn.Dropout(dropout)
         self.fc2 = nn.Linear(hidden_dim, hidden_dim // 2)
-        self.bn2 = nn.BatchNorm1d(hidden_dim // 2)
+        self.ln2 = nn.LayerNorm(hidden_dim // 2)
         self.dropout2 = nn.Dropout(dropout)
         self.fc3 = nn.Linear(hidden_dim // 2, num_classes)
         
     def forward(self, x):
-        x = torch.relu(self.bn1(self.fc1(x)))
+        # Convert to float32 if needed (sklearn passes float64)
+        if x.dtype == torch.float64:
+            x = x.float()
+        x = torch.relu(self.ln1(self.fc1(x)))
         x = self.dropout1(x)
-        x = torch.relu(self.bn2(self.fc2(x)))
+        x = torch.relu(self.ln2(self.fc2(x)))
         x = self.dropout2(x)
         x = self.fc3(x)
         return x
@@ -620,7 +631,7 @@ def search_cv_for_model(name, pipe, param_space, ks, X, y, groups, outdir, n_ite
             cv = GroupKFold(n_splits=5)
             cv_groups = groups
         else:
-            cv, y_bins = get_cv(y, groups=None, n_splits=5)
+            cv, y_bins = get_cv(y, groups=None, n_splits=5, seed=RANDOM_STATE)
             cv_groups = None
         search = BayesSearchCV(
             estimator=pipe,
@@ -644,7 +655,7 @@ def search_cv_for_model(name, pipe, param_space, ks, X, y, groups, outdir, n_ite
             cv = GroupKFold(n_splits=5)
             cv_groups = groups
         else:
-            cv, y_bins = get_cv(y, groups=None, n_splits=5)
+            cv, y_bins = get_cv(y, groups=None, n_splits=5, seed=RANDOM_STATE)
             cv_groups = None
         search = RandomizedSearchCV(
             estimator=pipe,
@@ -824,7 +835,7 @@ def create_comparison_visualizations(summary_df, outdir):
     # 5. Box plot showing metric distribution
     fig, ax = plt.subplots(figsize=(12, 6))
     melted = summary_df.melt(id_vars='model', value_vars=metrics, 
-                             var_name='Metric', value_name='Score')
+                            var_name='Metric', value_name='Score')
     sns.boxplot(data=melted, x='Metric', y='Score', ax=ax, palette='Set2')
     sns.swarmplot(data=melted, x='Metric', y='Score', color='black', alpha=0.5, ax=ax)
     ax.set_title('Distribution of Metrics Across All Models', fontsize=16, fontweight='bold')
@@ -841,6 +852,20 @@ def create_comparison_visualizations(summary_df, outdir):
     print("  - model_ranking.png")
     print("  - metrics_distribution.png")
 
+# Define callback at module level so it can be pickled
+if HAVE_TORCH:
+    from skorch.callbacks import Callback
+    
+    class SetInputDim(Callback):
+        """Dynamically set input_dim based on data shape after pipeline transforms"""
+        def on_train_begin(self, net, X, y):
+            # X shape after pipeline: (n_samples, n_features_selected)
+            n_features = X.shape[1] if hasattr(X, 'shape') else X.shape[1]
+            # Reinitialize module with correct input_dim
+            net.set_params(module__input_dim=n_features)
+            net.initialize()
+
+
 def main():
     global logger  # Declare we're modifying the global logger
     # Initialize logger first
@@ -855,7 +880,7 @@ def main():
     # ============================================================
     # MODEL SELECTION FLAGS - Set to True/False to enable/disable
     # ============================================================
-    TRAIN_LOGISTIC_REGRESSION = False
+    TRAIN_LOGISTIC_REGRESSION = True
     TRAIN_RANDOM_FOREST = True
     TRAIN_XGBOOST = True
     TRAIN_KNN = True
@@ -1020,9 +1045,10 @@ def main():
         if HAVE_TORCH and torch.cuda.is_available():
             print("    Using PyTorch MLP (GPU)")
             device = 'cuda'
+            
+            # Use the module-level SetInputDim callback
             mlp = NeuralNetClassifier(
                 module=TorchMLP,
-                module__input_dim=n_features,
                 module__hidden_dim=128,
                 module__num_classes=num_classes,
                 module__dropout=0.2,
@@ -1032,6 +1058,8 @@ def main():
                 iterator_train__shuffle=True,
                 device=device,
                 verbose=1,
+                callbacks=[SetInputDim()],  # Now this can be pickled
+                warm_start=False,  # Ensure clean initialization
             )
             models.append((
                 "MLP_GPU",
