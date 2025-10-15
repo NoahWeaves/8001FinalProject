@@ -10,6 +10,7 @@ data_EDA.ipynb
 logs/
 runs/
 *.log
+runs/models/classif_*
 
 # Python
 __pycache__/
