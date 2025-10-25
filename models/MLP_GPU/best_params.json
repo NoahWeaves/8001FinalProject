@@ -1,7 +1,7 @@
 {
-  "model__batch_size": 64,
-  "model__lr": 0.0019254152592663122,
-  "model__module__dropout": 0.19394695981496918,
-  "model__module__hidden_dim": 64,
+  "model__batch_size": 512,
+  "model__lr": 0.0049677997257570414,
+  "model__module__dropout": 0.29985695477475327,
+  "model__module__hidden_dim": 128,
   "select__k": 64
 }
