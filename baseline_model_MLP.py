@@ -841,7 +841,7 @@ def main():
             "MLP_GPU",
             build_pipeline(mlp, scale_for_model=True, n_features=n_features,
                         scaler_type="standard", impute=True),
-            mlp_space_gpu(n_features, num_classes)
+            mlp_space_gpu()
         ))
     else:
         print("    Using sklearn MLP (CPU)")
