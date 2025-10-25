@@ -755,17 +755,6 @@ def main():
     dump(le, outdir / "label_encoder.joblib")
     num_classes = len(le.classes_)
     
-    unique_classes, class_counts = np.unique(y_train, return_counts=True)
-    weights = len(y_train) / (len(unique_classes) * class_counts)
-    weights = torch.tensor(weights, dtype=torch.float32, device='cuda')
-    print(f"Classes and their weights for handling imbalance: {dict(zip(le.classes_, weights.cpu().numpy()))}")
-    
-    epoch_f1 = EpochScoring(
-        scoring=make_scorer(f1_score, average='weighted'),
-        lower_is_better=False,
-        name='valid_f1'
-    )
-
     # Save mapping for later interpretability
     label_map = dict(zip(le.classes_, le.transform(le.classes_)))
     print(f"Label mapping: {label_map}")
@@ -803,6 +792,19 @@ def main():
     # Delete full dataset to free memory
     del X, y, groups
     gc.collect()
+
+    # Compute class weights for imbalanced data (now that y_train exists)
+    unique_classes, class_counts = np.unique(y_train, return_counts=True)
+    weights = len(y_train) / (len(unique_classes) * class_counts)
+    weights = torch.tensor(weights, dtype=torch.float32, device='cuda') if HAVE_TORCH and torch.cuda.is_available() else weights
+    print(f"Classes and their weights for handling imbalance: {dict(zip(le.classes_, weights.cpu().numpy() if HAVE_TORCH and torch.cuda.is_available() else weights))}")
+    
+    # Define F1 scorer callback
+    epoch_f1 = EpochScoring(
+        scoring=make_scorer(f1_score, average='weighted'),
+        lower_is_better=False,
+        name='valid_f1'
+    ) if HAVE_TORCH else None
 
     # Models to train
     models = []
