@@ -23,6 +23,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, confusion_matrix, classification_report
+from sklearn.metrics import make_scorer
 import seaborn as sns
 import matplotlib.pyplot as plt
 import glob
@@ -736,9 +737,6 @@ def main():
     print(f"  Sampling strategy: {'per-file' if SAMPLE_PER_FILE else 'combined'}")
     print(f"  Target memory usage: ~8-16 GB RAM")
     
-    print(f"\nModel Selection:")
-    print(f"  MLP: {'✓' if TRAIN_MLP else '✗'}")
-    
     # Print initial memory state
     try:
         print_memory_usage()
@@ -762,6 +760,12 @@ def main():
     weights = torch.tensor(weights, dtype=torch.float32, device='cuda')
     print(f"Classes and their weights for handling imbalance: {dict(zip(le.classes_, weights.cpu().numpy()))}")
     
+    epoch_f1 = EpochScoring(
+        scoring=make_scorer(f1_score, average='weighted'),
+        lower_is_better=False,
+        name='valid_f1'
+    )
+
     # Save mapping for later interpretability
     label_map = dict(zip(le.classes_, le.transform(le.classes_)))
     print(f"Label mapping: {label_map}")
@@ -820,13 +824,14 @@ def main():
             batch_size=256,                    # larger batch uses GPU better
             optimizer=torch.optim.AdamW,       # <— use Adam/AdamW instead of default SGD
             criterion=nn.CrossEntropyLoss,     # <— matches raw logits from TorchMLP
+            criterion__weight=weights,
             iterator_train__shuffle=True,
             device='cuda',
             verbose=1,
             callbacks=[
                 SetInputDim(),
-                EpochScoring('accuracy', lower_is_better=False, name='valid_acc'),
-                EarlyStopping(monitor='valid_acc', patience=10, threshold=1e-4),
+                epoch_f1,
+                EarlyStopping(monitor='valid_f1', patience=10, threshold=1e-4),
             ],
             warm_start=False,
         )
