@@ -1,6 +1,7 @@
 # Data directories
 data/
 papers/
+ss/
 
 # Project files
 git_github_lab_workflow.md
@@ -45,7 +46,7 @@ venv.bak/
 
 # Jupyter Notebook
 .ipynb_checkpoints
-# *.ipynb
+*.ipynb
 
 # IDE
 .vscode/
