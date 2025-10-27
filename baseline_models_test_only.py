@@ -29,6 +29,7 @@ try:
     import torch
     import torch.nn as nn
     from skorch import NeuralNetClassifier
+    from skorch.callbacks import Callback
     HAVE_TORCH = True
     
     # Define TorchMLP class for loading PyTorch models
@@ -53,6 +54,16 @@ try:
             x = self.dropout2(x)
             x = self.fc3(x)
             return x
+    
+    # Define SetInputDim callback for loading saved models
+    class SetInputDim(Callback):
+        """Dynamically set input_dim based on data shape after pipeline transforms"""
+        def on_train_begin(self, net, X, y):
+            # X shape after pipeline: (n_samples, n_features_selected)
+            n_features = X.shape[1] if hasattr(X, 'shape') else X.shape[1]
+            # Reinitialize module with correct input_dim
+            net.set_params(module__input_dim=n_features)
+            net.initialize()
             
 except ImportError:
     HAVE_TORCH = False
