@@ -49,6 +49,7 @@ venv.bak/
 *.ipynb
 
 # IDE
+.github/
 .vscode/
 .idea/
 *.swp
@@ -80,3 +81,4 @@ Thumbs.db
 # Data
 # *.csv
 *.zip
+*.safetensors

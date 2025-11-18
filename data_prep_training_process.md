@@ -121,6 +121,21 @@ Log entries showing “Class distribution before sampling / Sampling plan / Clas
 
 ---
 
+## 12) LLM fine-tuning on data_processed (separate script)
+
+- Inputs: data_processed/*_train.csv for training, data_processed/*_test.csv for final evaluation. These splits are pre-defined; no CV is used for the LLM track.
+- Feature policy: drop identifiers (`Unnamed: 0`, `Flow ID`, `Source IP`, `Destination IP`, `SimillarHTTP`, `Inbound`) and exclude `Timestamp`/`Scenario` from features. Replace ±inf with NaN.
+- Text serialization: remaining feature columns are serialized into a compact text prompt (e.g., `key=value` lines). Labels are mapped via a `label2id` built only from training labels.
+- Models: Llama-3.2-1B and Llama-3.2-3B with a sequence-classification head, trained via Transformers Trainer + PEFT (LoRA/QLoRA). Tokenizer pad token is set to EOS if missing.
+- Evaluation: run inference on the test split and compute the same metrics as baseline (Accuracy, F1_macro/weighted, Precision_macro/weighted, Recall_macro/weighted), plus confusion matrix and classification report. Artifacts are saved to runs/llm/classif_YYYYMMDD_HHMMSS/{model_name}/.
+
+Leakage stance for LLM path:
+1) Train/test are fixed; the label map is derived from training labels only.
+2) Identifiers and time/scenario fields are excluded from features before text serialization.
+3) Test is used strictly for final inference/metrics; no test-derived statistics are used during training.
+
+---
+
 ## Why there’s **no data leakage** (checklist)
 
 1. **Temporal separation:** Train/test and CV folds are split by **minute-groups**, so no example shares a time window across splits.  
