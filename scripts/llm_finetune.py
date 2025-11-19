@@ -1,4 +1,4 @@
-import os, json, time, gc, glob, inspect
+import os, json, time, gc, glob, inspect, logging
 from functools import lru_cache
 from pathlib import Path
 import pandas as pd
@@ -34,18 +34,23 @@ from transformers import (
     BitsAndBytesConfig,
 )
 from peft import LoraConfig, get_peft_model
-from transformers import EarlyStoppingCallback
+from transformers import EarlyStoppingCallback, TrainerCallback
 
 RANDOM_STATE = 42
 np.random.seed(RANDOM_STATE)
 torch.manual_seed(RANDOM_STATE)
 
 DROP_COLS = ["Unnamed: 0", "Flow ID", "Source IP", "Destination IP", "SimillarHTTP", "Inbound"]
+LOGGING_STEPS = 400
 
 EARLY_STOP_METRICS = {
     "loss": ("loss", False),
     "f1_weighted": ("eval_F1_weighted", True),
     "f1_macro": ("eval_F1_macro", True),
+    "recall_weighted": ("eval_recall_weighted", True),
+    "recall_macro": ("eval_recall_macro", True),
+    "precision_weighted": ("eval_precision_weighted", True),
+    "precision_macro": ("eval_precision_macro", True),
     "accuracy": ("eval_Accuracy", True),
 }
 
@@ -66,11 +71,29 @@ def _resolve_eval_strategy_key():
         return "eval_strategy"
     return None
 
-def make_output_dir(base="runs/llm"):
-    ts = time.strftime("%Y%m%d_%H%M%S")
+def make_output_dir(base="runs/llm", *, ts: Optional[str] = None):
+    ts = ts or time.strftime("%Y%m%d_%H%M%S")
     outdir = Path(base) / f"classif_{ts}"
     outdir.mkdir(parents=True, exist_ok=True)
     return outdir
+
+
+def setup_run_logger(run_ts: str):
+    logs_dir = Path("logs")
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    log_path = logs_dir / f"llm_model_{run_ts}.log"
+    logger = logging.getLogger(f"llm_finetune_{run_ts}")
+    logger.setLevel(logging.INFO)
+    logger.handlers.clear()
+
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    file_handler = logging.FileHandler(log_path, encoding="utf-8")
+    file_handler.setFormatter(formatter)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    logger.addHandler(stream_handler)
+    return logger, log_path
 
 def load_processed_splits():
     train_paths = sorted(glob.glob("data_processed/*_train.csv"))
@@ -165,6 +188,17 @@ class TextClsDataset(torch.utils.data.Dataset):
         item["labels"] = torch.tensor(self.labels[idx], dtype=torch.long)
         return item
 
+
+class MetricsLoggerCallback(TrainerCallback):
+    def __init__(self, logger):
+        self.logger = logger
+
+    def on_evaluate(self, args, state, control, metrics=None, **kwargs):
+        if not metrics:
+            return
+        metric_str = ", ".join(f"{k}={v:.6f}" if isinstance(v, (int, float)) else f"{k}={v}" for k, v in metrics.items())
+        self.logger.info("Evaluation metrics: %s", metric_str)
+
 def build_label_map(train_labels):
     classes = sorted(pd.Series(train_labels).unique())
     label2id = {c: i for i, c in enumerate(classes)}
@@ -187,8 +221,8 @@ def compute_metrics_fn(eval_pred, id2label):
     }
     return metrics
 
-def plot_and_save_confusion(y_true, y_pred, id2label, path_png):
-    cm = confusion_matrix(y_true, y_pred)
+def plot_and_save_confusion(y_true, y_pred, id2label, path_png, labels=None):
+    cm = confusion_matrix(y_true, y_pred, labels=labels)
     plt.figure(figsize=(10, 8))
     sns.heatmap(cm, cmap="Blues", annot=False)
     plt.title("Confusion Matrix – LLM")
@@ -205,9 +239,9 @@ def main():
                         help="meta-llama/Llama-3.2-1B or meta-llama/Llama-3.2-3B (mapped to local models/ folders)")
     parser.add_argument("--epochs", type=int, default=2)
     parser.add_argument("--lr", type=float, default=2e-4)
-    parser.add_argument("--per-device-train-batch-size", type=int, default=2)
-    parser.add_argument("--per-device-eval-batch-size", type=int, default=4)
-    parser.add_argument("--max-length", type=int, default=512)
+    parser.add_argument("--per-device-train-batch-size", type=int, default=8)
+    parser.add_argument("--per-device-eval-batch-size", type=int, default=8)
+    parser.add_argument("--max-length", type=int, default=1024)
     parser.add_argument("--gradient-accumulation-steps", type=int, default=8)
     parser.add_argument(
         "--use-4bit",
@@ -225,7 +259,7 @@ def main():
     parser.add_argument(
         "--use-prompt",
         action="store_true",
-        default=False,
+        default=True,
         help="If set, prepend an instruction-style prompt and feed a comma-separated value list as input.",
     )
     parser.add_argument(
@@ -234,6 +268,30 @@ def main():
         default=None,
         help="Optional prompt template containing '{val}' placeholder. "
              "If omitted and --use-prompt is set, a sensible default is used.",
+    )
+    parser.add_argument(
+        "--early-stop-metric",
+        type=lambda s: s.lower(),
+        choices=sorted(EARLY_STOP_METRICS.keys()),
+        default="loss",
+        help=(
+            "Metric used by early stopping and best-model tracking. "
+            "'loss' monitors training loss, other options monitor eval metrics."
+        ),
+    )
+    parser.add_argument(
+        "--eval-on-steps",
+        action="store_true",
+        help=(
+            "If set, run evaluation/checkpointing every LOGGING_STEPS instead of once per epoch. "
+            "LOGGING_STEPS is currently fixed at 50."
+        ),
+    )
+    parser.add_argument(
+        "--resume-from-checkpoint",
+        type=str,
+        default=None,
+        help="Optional path to a Trainer checkpoint directory (e.g. runs/models/.../checkpoint-3600) to resume from.",
     )
     args = parser.parse_args()
 
@@ -250,29 +308,57 @@ def main():
         local_model_dir = Path(args.model_id)
         model_parent_dir = Path("models")
 
+    run_ts = time.strftime("%Y%m%d_%H%M%S")
+    logger, log_path = setup_run_logger(run_ts)
+    resume_checkpoint = None
+    if args.resume_from_checkpoint:
+        resume_checkpoint = Path(args.resume_from_checkpoint)
+        if not resume_checkpoint.exists():
+            raise FileNotFoundError(f"Checkpoint path not found: {resume_checkpoint}")
+        if not resume_checkpoint.is_dir():
+            raise ValueError(f"Checkpoint path must be a directory: {resume_checkpoint}")
+
+    metric_for_best_model, greater_is_better = EARLY_STOP_METRICS[args.early_stop_metric]
+    requires_eval_metric = metric_for_best_model.startswith("eval_")
+    eval_mode = "steps" if args.eval_on_steps else "epoch"
+
     # Determine metrics/artifacts root (model-specific) and checkpoint root (global runs/models/)
     if args.output_base is not None:
-        metrics_root = make_output_dir(base=args.output_base)
+        metrics_root = make_output_dir(base=args.output_base, ts=run_ts)
     else:
-        metrics_root = make_output_dir(base=str(model_parent_dir))
+        metrics_root = make_output_dir(base=str(model_parent_dir), ts=run_ts)
 
     # Checkpoints (full Trainer checkpoints) always go under runs/models/
-    checkpoints_root = make_output_dir(base="runs/models")
+    checkpoints_root = make_output_dir(base="runs/models", ts=run_ts)
 
     model_name_sanitized = local_model_dir.name.replace(".", "_")
     model_out = metrics_root / model_name_sanitized
     model_out.mkdir(parents=True, exist_ok=True)
+    artifact_prefix = f"{model_name_sanitized}_holdout"
 
     best_dir = model_parent_dir / "best"
     best_dir.mkdir(parents=True, exist_ok=True)
 
-    print("="*80)
-    print(f"LLM fine-tuning: {args.model_id}")
-    print("="*80)
-    print(f"Model load dir: {local_model_dir}")
-    print(f"Quantization: {'4-bit QLoRA' if args.use_4bit else 'full-precision LoRA'}")
-    print(f"Checkpoints dir: {checkpoints_root}")
-    print(f"Run artifacts dir: {model_out}")
+    logger.info("=" * 80)
+    logger.info("LLM fine-tuning: %s", args.model_id)
+    logger.info("=" * 80)
+    logger.info("Model load dir: %s", local_model_dir)
+    logger.info("Quantization: %s", "4-bit QLoRA" if args.use_4bit else "full-precision LoRA")
+    logger.info("Checkpoints dir: %s", checkpoints_root)
+    logger.info("Run artifacts dir: %s", model_out)
+    logger.info(
+        "Early-stop metric: %s (%s)",
+        args.early_stop_metric,
+        "maximize" if greater_is_better else "minimize",
+    )
+    logger.info("Run log file: %s", log_path)
+    logger.info(
+        "Evaluation cadence: %s every %s step(s)",
+        "steps" if args.eval_on_steps else "epoch",
+        LOGGING_STEPS if args.eval_on_steps else "epoch-end",
+    )
+    if resume_checkpoint:
+        logger.info("Resuming from checkpoint: %s", resume_checkpoint)
 
     # Load data
     train_df, test_df = load_processed_splits()
@@ -346,14 +432,24 @@ def main():
     # Training args
     training_arg_params = _training_args_params()
     strategy_kwargs = {}
+    save_mode = eval_mode
     if "save_strategy" in training_arg_params:
-        strategy_kwargs["save_strategy"] = "epoch"
+        strategy_kwargs["save_strategy"] = save_mode
+        if args.eval_on_steps and "save_steps" in training_arg_params:
+            strategy_kwargs["save_steps"] = LOGGING_STEPS
     eval_strategy_key = _resolve_eval_strategy_key()
     if eval_strategy_key:
-        strategy_kwargs[eval_strategy_key] = "epoch"
+        strategy_kwargs[eval_strategy_key] = eval_mode
+        if args.eval_on_steps and "eval_steps" in training_arg_params:
+            strategy_kwargs["eval_steps"] = LOGGING_STEPS
     else:
-        print(
-            "Warning: Current transformers.TrainingArguments does not expose an evaluation strategy parameter; "
+        if requires_eval_metric or args.eval_on_steps:
+            raise RuntimeError(
+                "The current transformers build does not expose evaluation strategy controls required for "
+                "the requested configuration."
+            )
+        logger.warning(
+            "Current transformers.TrainingArguments does not expose an evaluation strategy parameter; "
             "skipping per-epoch evaluation configuration."
         )
 
@@ -365,9 +461,9 @@ def main():
         learning_rate=args.lr,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         load_best_model_at_end=True,
-        metric_for_best_model="loss",  # use training loss as early-stopping target surrogate
-        greater_is_better=False,
-        logging_steps=50,
+        metric_for_best_model=metric_for_best_model,
+        greater_is_better=greater_is_better,
+        logging_steps=LOGGING_STEPS,
         bf16=torch.cuda.is_available(),
         fp16=False,
         report_to=[],
@@ -391,14 +487,19 @@ def main():
             EarlyStoppingCallback(
                 early_stopping_patience=10,
                 early_stopping_threshold=0.0,
-            )
+            ),
+            MetricsLoggerCallback(logger),
         ],
     )
 
-    print("Starting training with early stopping (patience=10, monitor=loss)...")
-    trainer.train()
+    logger.info(
+        "Starting training with early stopping (patience=%s, monitor=%s)...",
+        10,
+        args.early_stop_metric,
+    )
+    trainer.train(resume_from_checkpoint=str(resume_checkpoint) if resume_checkpoint else None)
 
-    print("Running inference on test set...")
+    logger.info("Running inference on test set...")
     preds_output = trainer.predict(test_ds)
     logits = preds_output.predictions
     y_pred = np.argmax(logits, axis=-1)
@@ -416,16 +517,33 @@ def main():
 
     # Save artifacts mirroring baseline
     (model_out / "preds").mkdir(exist_ok=True, parents=True)
+    preds_path = model_out / f"{artifact_prefix}_preds.csv"
     pd.DataFrame({
         "y_true": [id2label[i] for i in y_test],
         "y_pred": [id2label[i] for i in y_pred],
-    }).to_csv(model_out / "LLM_holdout_preds.csv", index=False)
+    }).to_csv(preds_path, index=False)
 
-    plot_and_save_confusion(y_test, y_pred, id2label, model_out / "LLM_holdout_confusion_matrix.png")
-    report = classification_report(y_test, y_pred, target_names=[id2label[i] for i in range(len(id2label))], output_dict=True, zero_division=0)
-    pd.DataFrame(report).transpose().to_csv(model_out / "LLM_holdout_classification_report.csv")
+    label_indices = list(range(len(id2label)))
+    plot_and_save_confusion(
+        y_test,
+        y_pred,
+        id2label,
+        model_out / f"{artifact_prefix}_confusion_matrix.png",
+        labels=label_indices,
+    )
+    report = classification_report(
+        y_test,
+        y_pred,
+        labels=label_indices,
+        target_names=[id2label[i] for i in label_indices],
+        output_dict=True,
+        zero_division=0,
+    )
+    pd.DataFrame(report).transpose().to_csv(
+        model_out / f"{artifact_prefix}_classification_report.csv"
+    )
 
-    with open(model_out / "LLM_holdout_metrics.json", "w") as f:
+    with open(model_out / f"{artifact_prefix}_metrics.json", "w") as f:
         json.dump(metrics, f, indent=2)
 
     with open(model_out / "label_map.json", "w") as f:
@@ -445,7 +563,7 @@ def main():
             "use_4bit": args.use_4bit,
             "lora": {
                 "r": lora_cfg.r, "alpha": lora_cfg.lora_alpha, "dropout": lora_cfg.lora_dropout,
-                "target_modules": lora_cfg.target_modules
+                "target_modules": list(lora_cfg.target_modules)
             },
             "max_length": args.max_length,
         }, f, indent=2)
@@ -457,7 +575,17 @@ def main():
     # (this can be overwritten by subsequent runs for the same base model)
     trainer.save_model(best_dir)
 
-    print("="*80)
-    print("LLM training complete")
-    print(f"Results saved to: {model_out}")
-    print(f"Best model adapter saved to: {best_dir}")
+    logger.info("=" * 80)
+    logger.info("LLM training complete")
+    logger.info("Results saved to: %s", model_out)
+    logger.info("Best model adapter saved to: %s", best_dir)
+    logger.info("=" * 80)
+
+    # Cleanup
+    del model, trainer
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+if __name__ == "__main__":
+    main()
