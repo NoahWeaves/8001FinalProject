@@ -82,40 +82,30 @@ In `baseline_models.py`, adjust these variables in `main()`:
 - Label encoder mapping is saved alongside results.
 - Adjust feature selection grid and search iterations inside baseline_models.py if needed.
 
-## New: LLM fine-tuning on data_processed
+## LLM fine-tuning on data_processed
 
-We additionally fine-tune small LLMs for the same classification task using pre-split files under `data_processed/`:
-- Models: meta-llama/Llama-3.2-1B and meta-llama/Llama-3.2-3B
-- Local directories (original base models expected here):
-  - `models/llama-3.2-1B/llama-3.2-1B`
-  - `models/llama-3.2-3B/llama-3.2-3B`
-- Train on: `data_processed/*_train.csv`
-- Test on: `data_processed/*_test.csv`
+We additionally fine-tune small LLMs (Qwen and Phi) for the same classification task using the pre-split files under `data_processed/`:
+- Models (examples used in the project): `Qwen/Qwen2.5-1.5B-Instruct`, `Qwen/Qwen2.5-7B-Instruct`, `microsoft/Phi-3.5-mini-instruct`, `microsoft/Phi-3.5-MoE-instruct`.
+- Train on: `data_processed/*_train.csv`.
+- Test on: `data_processed/*_test.csv`.
 - Input format (default): each row is serialized as a single line of `"key=value"` pairs, space-separated, excluding `Label`, `Timestamp`, and `Scenario`.
 - Optional prompt mode: with `--use-prompt`, features are turned into a comma-separated value list and injected into a prompt template via the `{val}` placeholder, e.g.:
   - `--use-prompt --prompt-template "Based on the following input return the most likely type of situation from the following list: ['BENIGN', 'DrDoS_LDAP', 'DrDoS_MSSQL', 'DrDoS_NetBIOS', 'DrDoS_UDP', 'Syn', 'UDP-lag'].\\nInput: {val}\\nOutput: "`
-- Fine-tuned outputs (metrics, preds, plots, adapter copy) are written under the corresponding parent folders:
-  - `models/llama-3.2-1B/`
-  - `models/llama-3.2-3B/`
-  in timestamped subdirectories (e.g., `models/llama-3.2-1B/classif_YYYYMMDD_HHMMSS/llama-3.2-1B/`).
+- Fine-tuned outputs (metrics, preds, plots, adapter copy) are written under model-specific folders beneath `models/` in timestamped subdirectories (e.g., `models/Qwen_Qwen2.5-1.5B-Instruct/classif_YYYYMMDD_HHMMSS/`).
 - Trainer checkpoints (including intermediate epochs) are stored under:
   - `runs/models/classif_YYYYMMDD_HHMMSS/`
-- The final/best fine-tuned adapter is additionally saved to:
-  - `models/llama-3.2-1B/best/`
-  - `models/llama-3.2-3B/best/`
-  (overwritten by subsequent runs for the same base model).
 
 Install (extras for LLMs):
-- pip install -U transformers peft bitsandbytes accelerate torch scikit-learn seaborn matplotlib pandas
+- `pip install -U transformers peft bitsandbytes accelerate torch scikit-learn seaborn matplotlib pandas`
 
-Auth (Meta Llama access):
-- Set HUGGINGFACE_TOKEN env var or run `huggingface-cli login` after accepting the model licenses.
+Auth (Hugging Face Hub):
+- Set `HUGGINGFACE_TOKEN` env var or run `huggingface-cli login` for gated models.
 
-Run:
-- python scripts/llm_finetune.py --model-id meta-llama/Llama-3.2-1B
-- python scripts/llm_finetune.py --model-id meta-llama/Llama-3.2-3B
+Run (examples):
+- `python scripts/llm_finetune.py --model-id Qwen/Qwen2.5-1.5B-Instruct`
+- `python scripts/llm_finetune.py --model-id microsoft/Phi-3.5-mini-instruct`
 
 Notes:
-- Script uses LoRA in full precision by default; pass `--use-4bit` to enable 4-bit QLoRA when VRAM is constrained. With 24 GB VRAM, full-precision LoRA on the 1B and 3B models is expected to fit.
-- Early stopping is enabled with a patience of 10 epochs, monitoring the loss (via the Trainer), to avoid unnecessary epochs when the model has converged.
+- Script uses QLoRA (4-bit) by default for larger models and can fall back to full-precision LoRA on smaller models if VRAM permits.
+- Early stopping is enabled with a patience of 10 epochs, monitoring the loss via the Trainer.
 - Identifiers/timestamps/scenario are excluded from features. The same metrics as baseline are produced (Accuracy, F1, Precision, Recall), plus confusion matrix/report.
