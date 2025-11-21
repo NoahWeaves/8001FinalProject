@@ -1,4 +1,4 @@
-# LLM-Based DDoS Controller Ablation Study
+# Phi-Mini Ablation Study
 
 ## Setup
 
