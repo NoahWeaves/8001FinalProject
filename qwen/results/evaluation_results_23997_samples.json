@@ -1,0 +1,264 @@
+{
+    "accuracy": 0.9720358408001667,
+    "report": {
+        "benign": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 2000.0
+        },
+        "benign-": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 0.0
+        },
+        "benign_b": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 0.0
+        },
+        "benign_d": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 0.0
+        },
+        "benign_m": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 0.0
+        },
+        "benign_sn": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 0.0
+        },
+        "benign_t": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 0.0
+        },
+        "benign_ud": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 0.0
+        },
+        "benign_udp": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 0.0
+        },
+        "benignudp": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 0.0
+        },
+        "drdos_d": {
+            "precision": 0.9994984954864594,
+            "recall": 0.9989974937343359,
+            "f1-score": 0.9992479318124843,
+            "support": 1995.0
+        },
+        "drdos_dn": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 4.0
+        },
+        "drdos_dns": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 1.0
+        },
+        "drdos_ld": {
+            "precision": 0.9925373134328358,
+            "recall": 0.9975,
+            "f1-score": 0.9950124688279302,
+            "support": 2000.0
+        },
+        "drdos_m": {
+            "precision": 0.9900199600798403,
+            "recall": 1.0,
+            "f1-score": 0.9949849548645938,
+            "support": 1984.0
+        },
+        "drdos_ms": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 16.0
+        },
+        "drdos_n": {
+            "precision": 0.9994883601944231,
+            "recall": 0.9949070537305832,
+            "f1-score": 0.9971924451250638,
+            "support": 3927.0
+        },
+        "drdos_ne": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 40.0
+        },
+        "drdos_nt": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 11.0
+        },
+        "drdos_ntp": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 22.0
+        },
+        "drdos_s": {
+            "precision": 0.9834420471650778,
+            "recall": 0.9989806320081549,
+            "f1-score": 0.9911504424778761,
+            "support": 1962.0
+        },
+        "drdos_sn": {
+            "precision": 0.9609450337512054,
+            "recall": 1.0,
+            "f1-score": 0.9800835997049422,
+            "support": 1993.0
+        },
+        "drdos_snm": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 3.0
+        },
+        "drdos_snmp": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 2.0
+        },
+        "drdos_ss": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 40.0
+        },
+        "drdos_u": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 34.0
+        },
+        "drdos_ud": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 139.0
+        },
+        "drdos_udp": {
+            "precision": 0.9994487320837927,
+            "recall": 0.9923371647509579,
+            "f1-score": 0.9958802526778358,
+            "support": 1827.0
+        },
+        "ntp_dns": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 0.0
+        },
+        "syn": {
+            "precision": 1.0,
+            "recall": 0.854,
+            "f1-score": 0.9212513484358145,
+            "support": 2000.0
+        },
+        "synd": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 0.0
+        },
+        "syns": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 0.0
+        },
+        "synu": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 0.0
+        },
+        "tftp": {
+            "precision": 1.0,
+            "recall": 0.9935,
+            "f1-score": 0.9967394030599448,
+            "support": 2000.0
+        },
+        "tftp_mss": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 0.0
+        },
+        "udp": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 0.0
+        },
+        "udp-lag": {
+            "precision": 1.0,
+            "recall": 0.9944862155388471,
+            "f1-score": 0.9972354863030912,
+            "support": 1995.0
+        },
+        "udp-lag-": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 0.0
+        },
+        "udp-lag4": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 0.0
+        },
+        "udp-laggi": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 0.0
+        },
+        "udp-lagom": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1-score": 0.0,
+            "support": 0.0
+        },
+        "accuracy": 0.9720358408001667,
+        "macro avg": {
+            "precision": 0.26647268151691794,
+            "recall": 0.26401728194543606,
+            "f1-score": 0.26509215447047746,
+            "support": 23995.0
+        },
+        "weighted avg": {
+            "precision": 0.9807849176480178,
+            "recall": 0.9720358408001667,
+            "f1-score": 0.9758880077616745,
+            "support": 23995.0
+        }
+    }
+}

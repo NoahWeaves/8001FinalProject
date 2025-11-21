@@ -1,0 +1,6 @@
+{
+  "model__C": 0.40687348033564463,
+  "model__gamma": "scale",
+  "model__kernel": "rbf",
+  "select__k": 32
+}

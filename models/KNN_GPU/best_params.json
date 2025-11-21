@@ -1,6 +1,0 @@
-{
-  "model__n_neighbors": 8,
-  "model__p": 2,
-  "model__weights": "uniform",
-  "select__k": 16
-}

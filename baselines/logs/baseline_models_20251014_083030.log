@@ -1,0 +1,142 @@
+2025-10-14 08:30:31,006 - INFO - ================================================================================
+2025-10-14 08:30:31,006 - INFO - Starting Baseline Models Training Pipeline
+2025-10-14 08:30:31,007 - INFO - ================================================================================
+2025-10-14 08:30:31,007 - INFO - 
+Dataset Configuration:
+2025-10-14 08:30:31,007 - INFO -   Max samples: 10,000
+2025-10-14 08:30:31,007 - INFO -   Sampling strategy: per-file
+2025-10-14 08:30:31,008 - INFO -   Target memory usage: ~8-16 GB RAM
+2025-10-14 08:30:31,008 - INFO - 
+Model Selection:
+2025-10-14 08:30:31,009 - INFO -   Logistic Regression: ✗
+2025-10-14 08:30:31,009 - INFO -   Random Forest: ✗
+2025-10-14 08:30:31,009 - INFO -   XGBoost: ✓
+2025-10-14 08:30:31,009 - INFO -   k-NN: ✓
+2025-10-14 08:30:31,009 - INFO -   MLP: ✓
+2025-10-14 08:30:31,010 - INFO -   SVC: ✓
+2025-10-14 08:30:31,010 - INFO - [Memory] Process RAM usage: 914.29 MB
+2025-10-14 08:30:31,011 - INFO - [Memory] GPU allocated: 0.00 MB, reserved: 0.00 MB
+2025-10-14 08:30:31,013 - INFO - Output directory: runs/models/classif_20251014_083031
+2025-10-14 08:30:31,014 - INFO - Loading data...
+2025-10-14 08:30:31,017 - INFO - Sampling strategy: 10,000 samples per file
+2025-10-14 08:30:31,050 - INFO - Loading: data/train/DrDoS_LDAP.csv
+2025-10-14 08:30:54,467 - INFO - Original dataset size: 2,181,542 rows
+2025-10-14 08:30:54,555 - INFO - Class distribution before sampling:
+2025-10-14 08:30:54,556 - INFO -   DrDoS_LDAP: 2,179,930 samples (99.93%)
+2025-10-14 08:30:54,557 - INFO -   BENIGN: 1,612 samples (0.07%)
+2025-10-14 08:30:54,557 - INFO - 
+Sampling plan:
+2025-10-14 08:30:54,557 - INFO -   DrDoS_LDAP: 8,610 samples
+2025-10-14 08:30:54,558 - INFO -   BENIGN: 4,000 samples
+2025-10-14 08:30:55,359 - INFO - 
+Sampled dataset size: 10,222 rows (0.47% of original)
+2025-10-14 08:30:55,359 - INFO - Class distribution after sampling:
+2025-10-14 08:30:55,360 - INFO -   DrDoS_LDAP: 8,610 samples (84.23%)
+2025-10-14 08:30:55,361 - INFO -   BENIGN: 1,612 samples (15.77%)
+2025-10-14 08:30:55,433 - INFO - Loading: data/train/DrDoS_MSSQL.csv
+2025-10-14 08:32:03,925 - INFO - Original dataset size: 4,524,498 rows
+2025-10-14 08:32:04,249 - INFO - Class distribution before sampling:
+2025-10-14 08:32:04,251 - INFO -   DrDoS_MSSQL: 4,522,492 samples (99.96%)
+2025-10-14 08:32:04,251 - INFO -   BENIGN: 2,006 samples (0.04%)
+2025-10-14 08:32:04,251 - INFO - 
+Sampling plan:
+2025-10-14 08:32:04,252 - INFO -   DrDoS_MSSQL: 8,328 samples
+2025-10-14 08:32:04,252 - INFO -   BENIGN: 4,000 samples
+2025-10-14 08:32:07,401 - INFO - 
+Sampled dataset size: 10,334 rows (0.23% of original)
+2025-10-14 08:32:07,401 - INFO - Class distribution after sampling:
+2025-10-14 08:32:07,405 - INFO -   DrDoS_MSSQL: 8,328 samples (80.59%)
+2025-10-14 08:32:07,406 - INFO -   BENIGN: 2,006 samples (19.41%)
+2025-10-14 08:32:07,869 - INFO - Loading: data/train/DrDoS_NetBIOS.csv
+2025-10-14 08:33:39,693 - INFO - Original dataset size: 4,094,986 rows
+2025-10-14 08:33:39,899 - INFO - Class distribution before sampling:
+2025-10-14 08:33:39,900 - INFO -   DrDoS_NetBIOS: 4,093,279 samples (99.96%)
+2025-10-14 08:33:39,900 - INFO -   BENIGN: 1,707 samples (0.04%)
+2025-10-14 08:33:39,901 - INFO - 
+Sampling plan:
+2025-10-14 08:33:39,901 - INFO -   DrDoS_NetBIOS: 8,541 samples
+2025-10-14 08:33:39,901 - INFO -   BENIGN: 4,000 samples
+2025-10-14 08:33:42,888 - INFO - 
+Sampled dataset size: 10,248 rows (0.25% of original)
+2025-10-14 08:33:42,889 - INFO - Class distribution after sampling:
+2025-10-14 08:33:42,893 - INFO -   DrDoS_NetBIOS: 8,541 samples (83.34%)
+2025-10-14 08:33:42,894 - INFO -   BENIGN: 1,707 samples (16.66%)
+2025-10-14 08:33:43,226 - INFO - Loading: data/train/DrDoS_UDP.csv
+2025-10-14 08:34:42,968 - INFO - Original dataset size: 3,136,802 rows
+2025-10-14 08:34:43,099 - INFO - Class distribution before sampling:
+2025-10-14 08:34:43,099 - INFO -   DrDoS_UDP: 3,134,645 samples (99.93%)
+2025-10-14 08:34:43,100 - INFO -   BENIGN: 2,157 samples (0.07%)
+2025-10-14 08:34:43,100 - INFO - 
+Sampling plan:
+2025-10-14 08:34:43,100 - INFO -   DrDoS_UDP: 8,224 samples
+2025-10-14 08:34:43,100 - INFO -   BENIGN: 4,000 samples
+2025-10-14 08:34:44,223 - INFO - 
+Sampled dataset size: 10,381 rows (0.33% of original)
+2025-10-14 08:34:44,224 - INFO - Class distribution after sampling:
+2025-10-14 08:34:44,229 - INFO -   DrDoS_UDP: 8,224 samples (79.22%)
+2025-10-14 08:34:44,229 - INFO -   BENIGN: 2,157 samples (20.78%)
+2025-10-14 08:34:44,340 - INFO - Loading: data/train/Syn.csv
+2025-10-14 08:34:59,114 - INFO - Original dataset size: 1,582,681 rows
+2025-10-14 08:34:59,184 - INFO - Class distribution before sampling:
+2025-10-14 08:34:59,185 - INFO -   Syn: 1,582,289 samples (99.98%)
+2025-10-14 08:34:59,185 - INFO -   BENIGN: 392 samples (0.02%)
+2025-10-14 08:34:59,185 - INFO - 
+Sampling plan:
+2025-10-14 08:34:59,185 - INFO -   Syn: 9,622 samples
+2025-10-14 08:34:59,185 - INFO -   BENIGN: 4,000 samples
+2025-10-14 08:34:59,971 - INFO - 
+Sampled dataset size: 10,014 rows (0.63% of original)
+2025-10-14 08:34:59,971 - INFO - Class distribution after sampling:
+2025-10-14 08:34:59,972 - INFO -   Syn: 9,622 samples (96.09%)
+2025-10-14 08:34:59,973 - INFO -   BENIGN: 392 samples (3.91%)
+2025-10-14 08:35:00,026 - INFO - Loading: data/train/UDPLag.csv
+2025-10-14 08:35:04,177 - INFO - Loaded 370,166 samples from UDPLag.csv (WebDDoS removed)
+2025-10-14 08:35:04,188 - INFO - Original dataset size: 370,166 rows
+2025-10-14 08:35:04,203 - INFO - Class distribution before sampling:
+2025-10-14 08:35:04,204 - INFO -   UDP-lag: 366,461 samples (99.00%)
+2025-10-14 08:35:04,204 - INFO -   BENIGN: 3,705 samples (1.00%)
+2025-10-14 08:35:04,204 - INFO - 
+Sampling plan:
+2025-10-14 08:35:04,205 - INFO -   UDP-lag: 7,276 samples
+2025-10-14 08:35:04,205 - INFO -   BENIGN: 4,000 samples
+2025-10-14 08:35:04,326 - INFO - 
+Sampled dataset size: 10,981 rows (2.97% of original)
+2025-10-14 08:35:04,327 - INFO - Class distribution after sampling:
+2025-10-14 08:35:04,328 - INFO -   UDP-lag: 7,276 samples (66.26%)
+2025-10-14 08:35:04,328 - INFO -   BENIGN: 3,705 samples (33.74%)
+2025-10-14 08:35:05,484 - INFO - Data loaded: 62,180 samples, 80 features
+2025-10-14 08:35:05,783 - INFO - Label mapping: {'BENIGN': np.int64(0), 'DrDoS_LDAP': np.int64(1), 'DrDoS_MSSQL': np.int64(2), 'DrDoS_NetBIOS': np.int64(3), 'DrDoS_UDP': np.int64(4), 'Syn': np.int64(5), 'UDP-lag': np.int64(6)}
+2025-10-14 08:35:05,784 - INFO - Number of classes: 7
+2025-10-14 08:35:05,785 - INFO - Feature selection grid: [8, 16, 32, 48, 64, 80]
+2025-10-14 08:35:05,785 - INFO - Performing group-based train/test split...
+2025-10-14 08:35:05,908 - INFO - Train set: 53403 samples
+2025-10-14 08:35:05,909 - INFO - Test set: 8777 samples
+2025-10-14 08:35:16,457 - INFO - [+] Adding XGBoost to training queue
+2025-10-14 08:35:16,504 - INFO -     Using XGBoost with gpu_hist on cuda
+2025-10-14 08:35:16,528 - INFO - [+] Adding k-NN to training queue
+2025-10-14 08:35:16,528 - INFO -     Using RAPIDS cuML KNN (GPU)
+2025-10-14 08:35:16,583 - INFO - [+] Adding MLP to training queue
+2025-10-14 08:35:16,584 - INFO -     Using PyTorch MLP (GPU)
+2025-10-14 08:35:16,586 - INFO - [+] Adding SVC to training queue
+2025-10-14 08:35:16,587 - INFO -     Using RAPIDS cuML SVC (GPU)
+2025-10-14 08:35:16,594 - INFO - 
+================================================================================
+2025-10-14 08:35:16,595 - INFO - Total models queued for training: 4
+2025-10-14 08:35:16,595 - INFO - ================================================================================
+2025-10-14 08:35:16,595 - INFO - 
+================================================================================
+2025-10-14 08:35:16,596 - INFO - === Tuning XGBoost_CUDA (1/4) ===
+2025-10-14 08:35:16,596 - INFO - ================================================================================
+2025-10-14 08:35:16,596 - INFO - [Memory] Process RAM usage: 3423.27 MB
+2025-10-14 08:35:16,675 - INFO - [Memory] GPU allocated: 0.00 MB, reserved: 0.00 MB
+2025-10-14 09:03:26,909 - INFO - XGBoost_CUDA holdout metrics: {'Accuracy': 0.9897459268542782, 'F1_macro': 0.7812873117428003, 'F1_weighted': 0.9905256082402382, 'Precision_macro': 0.764587816943371, 'Precision_weighted': 0.991875293769123, 'Recall_macro': 0.8082056042423778, 'Recall_weighted': 0.9897459268542782}
+2025-10-14 09:03:26,910 - INFO - Training time: 1689.43 seconds
+2025-10-14 09:03:27,294 - INFO - [Memory] Cleaned up after XGBoost_CUDA
+2025-10-14 09:03:27,295 - INFO - [Memory] Process RAM usage: 3541.25 MB
+2025-10-14 09:03:27,295 - INFO - [Memory] GPU allocated: 0.00 MB, reserved: 0.00 MB
+2025-10-14 09:03:27,295 - INFO - 
+================================================================================
+2025-10-14 09:03:27,296 - INFO - === Tuning KNN_GPU (2/4) ===
+2025-10-14 09:03:27,296 - INFO - ================================================================================
+2025-10-14 09:03:27,296 - INFO - [Memory] Process RAM usage: 3541.25 MB
+2025-10-14 09:03:27,297 - INFO - [Memory] GPU allocated: 0.00 MB, reserved: 0.00 MB
